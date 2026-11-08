@@ -1,8 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'dialogs.dart';
+import 'exercises_page.dart';
 import 'models.dart';
+import 'routines_page.dart';
 import 'storage.dart';
+import 'workout_page.dart';
 
 void main() {
   runApp(const MyApp());
@@ -13,9 +17,38 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const bigText = TextStyle(fontSize: 18, fontWeight: FontWeight.w600);
+    const bigButton = Size(64, 56);
+
     return MaterialApp(
       title: '운동 기록',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
+      theme: ThemeData(
+        colorSchemeSeed: Colors.indigo,
+        useMaterial3: true,
+        // 아이폰에서 누르기 쉽게 버튼과 글자를 키운다.
+        textTheme: const TextTheme(bodyLarge: TextStyle(fontSize: 18)),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+              minimumSize: bigButton, textStyle: bigText),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+              minimumSize: bigButton, textStyle: bigText),
+        ),
+        textButtonTheme: TextButtonThemeData(
+          style: TextButton.styleFrom(
+            minimumSize: const Size(64, 48),
+            textStyle: const TextStyle(fontSize: 17),
+          ),
+        ),
+        iconButtonTheme: IconButtonThemeData(
+          style: IconButton.styleFrom(
+              minimumSize: const Size(48, 48), iconSize: 26),
+        ),
+        listTileTheme: const ListTileThemeData(minTileHeight: 64),
+        inputDecorationTheme:
+            const InputDecorationTheme(border: OutlineInputBorder()),
+      ),
       home: const HomePage(),
     );
   }
@@ -29,8 +62,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  static const _titles = ['오늘 운동', '루틴', '종목'];
+
   AppData? _data;
   String? _error;
+  int _tab = 0;
 
   @override
   void initState() {
@@ -47,40 +83,23 @@ class _HomePageState extends State<HomePage> {
     }
   }
 
-  Future<void> _save() => Storage.save(_data!);
-
-  void _showMessage(String text) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text)));
-  }
-
-  Future<void> _addExercise() async {
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) =>
-          const _TextInputDialog(title: '종목 추가', hint: '예: 벤치프레스'),
-    );
-    if (name == null || name.trim().isEmpty) return;
-
-    setState(() {
-      _data!.exercises.add(Exercise(id: newId(), name: name.trim()));
-    });
-    await _save();
+  void _changed() {
+    setState(() {});
+    Storage.save(_data!);
   }
 
   Future<void> _copyBackup() async {
     await Clipboard.setData(ClipboardData(text: Storage.encode(_data!)));
     if (!mounted) return;
-    _showMessage('백업 내용을 복사했습니다. 메모 앱 등에 붙여넣어 보관하세요.');
+    showMessage(context, '백업 내용을 복사했습니다. 메모 앱 등에 붙여넣어 보관하세요.');
   }
 
   Future<void> _restoreBackup() async {
-    final text = await showDialog<String>(
-      context: context,
-      builder: (context) => const _TextInputDialog(
-        title: '백업 불러오기',
-        hint: '복사해 둔 백업 내용을 붙여넣으세요',
-        multiline: true,
-      ),
+    final text = await showTextInput(
+      context,
+      title: '백업 불러오기',
+      hint: '복사해 둔 백업 내용을 붙여넣으세요',
+      multiline: true,
     );
     if (text == null || text.trim().isEmpty) return;
 
@@ -89,34 +108,23 @@ class _HomePageState extends State<HomePage> {
       restored = Storage.decode(text.trim());
     } catch (_) {
       if (!mounted) return;
-      _showMessage('백업 형식이 올바르지 않습니다.');
+      showMessage(context, '백업 형식이 올바르지 않습니다.');
       return;
     }
 
     if (!mounted) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('백업 불러오기'),
-        content: const Text('지금 기록이 백업 내용으로 바뀝니다. 계속할까요?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('취소'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('불러오기'),
-          ),
-        ],
-      ),
+    final ok = await showConfirm(
+      context,
+      title: '백업 불러오기',
+      message: '지금 기록이 백업 내용으로 바뀝니다. 계속할까요?',
+      okLabel: '불러오기',
     );
-    if (ok != true) return;
+    if (!ok) return;
 
     setState(() => _data = restored);
-    await _save();
+    await Storage.save(restored);
     if (!mounted) return;
-    _showMessage('백업을 불러왔습니다.');
+    showMessage(context, '백업을 불러왔습니다.');
   }
 
   @override
@@ -133,19 +141,24 @@ class _HomePageState extends State<HomePage> {
       );
     } else if (data == null) {
       body = const Center(child: CircularProgressIndicator());
-    } else if (data.exercises.isEmpty) {
-      body = const Center(child: Text('+ 버튼으로 종목을 추가하세요'));
     } else {
-      body = ListView.builder(
-        itemCount: data.exercises.length,
-        itemBuilder: (context, i) =>
-            ListTile(title: Text(data.exercises[i].name)),
+      body = IndexedStack(
+        index: _tab,
+        children: [
+          WorkoutPage(
+            data: data,
+            onChanged: _changed,
+            keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
+          ),
+          RoutinesPage(data: data, onChanged: _changed),
+          ExercisesPage(data: data, onChanged: _changed),
+        ],
       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('종목'),
+        title: Text(_titles[_tab]),
         actions: [
           PopupMenuButton<String>(
             enabled: data != null,
@@ -159,61 +172,23 @@ class _HomePageState extends State<HomePage> {
         ],
       ),
       body: body,
-      floatingActionButton: data == null
+      bottomNavigationBar: data == null
           ? null
-          : FloatingActionButton(
-              onPressed: _addExercise,
-              child: const Icon(Icons.add),
+          : NavigationBar(
+              selectedIndex: _tab,
+              onDestinationSelected: (i) {
+                FocusScope.of(context).unfocus();
+                setState(() => _tab = i);
+              },
+              destinations: const [
+                NavigationDestination(
+                    icon: Icon(Icons.fitness_center), label: '오늘 운동'),
+                NavigationDestination(
+                    icon: Icon(Icons.playlist_add_check), label: '루틴'),
+                NavigationDestination(
+                    icon: Icon(Icons.format_list_bulleted), label: '종목'),
+              ],
             ),
-    );
-  }
-}
-
-class _TextInputDialog extends StatefulWidget {
-  const _TextInputDialog({
-    required this.title,
-    required this.hint,
-    this.multiline = false,
-  });
-
-  final String title;
-  final String hint;
-  final bool multiline;
-
-  @override
-  State<_TextInputDialog> createState() => _TextInputDialogState();
-}
-
-class _TextInputDialogState extends State<_TextInputDialog> {
-  final _controller = TextEditingController();
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: Text(widget.title),
-      content: TextField(
-        controller: _controller,
-        autofocus: true,
-        minLines: widget.multiline ? 4 : 1,
-        maxLines: widget.multiline ? 8 : 1,
-        decoration: InputDecoration(hintText: widget.hint),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('취소'),
-        ),
-        FilledButton(
-          onPressed: () => Navigator.pop(context, _controller.text),
-          child: const Text('확인'),
-        ),
-      ],
     );
   }
 }
