@@ -1,17 +1,7 @@
-# bodyprofile_app
+   # bodyprofile_app
 
-A new Flutter project.
+   개인적으로 쓰려고 만드는 운동·식단·체중 기록 웹앱입니다.
+   앱프로그래밍기초 수업 과제와는 별개의 개인 프로젝트입니다.
 
-## Getting Started
-
-This project is a starting point for a Flutter application.
-
-A few resources to get you started if this is your first Flutter project:
-
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+   - Flutter Web으로 만들고 GitHub Pages에 배포해서 아이폰 홈 화면에 추가해 사용
+   - 기록은 기기 안에만 저장
