@@ -10,8 +10,8 @@ String formatWeight(double w) =>
 
 class _SetRow {
   _SetRow({String weight = '', String reps = ''})
-      : weight = TextEditingController(text: weight),
-        reps = TextEditingController(text: reps);
+    : weight = TextEditingController(text: weight),
+      reps = TextEditingController(text: reps);
 
   final TextEditingController weight;
   final TextEditingController reps;
@@ -43,6 +43,7 @@ class WorkoutPage extends StatefulWidget {
 class _WorkoutPageState extends State<WorkoutPage> {
   String? _routineId;
   final Map<String, List<_SetRow>> _rows = {};
+  final Set<String> _collapsed = {};
   bool _dirty = false;
 
   String get _today => dateKey(DateTime.now());
@@ -82,9 +83,12 @@ class _WorkoutPageState extends State<WorkoutPage> {
     setState(() {
       _routineId = draft['routineId'] as String?;
       _dirty = draft['dirty'] == true;
+      _collapsed.addAll(List<String>.from(draft['collapsed'] as List? ?? []));
       for (final s in draft['sets'] as List? ?? []) {
         final m = s as Map<String, dynamic>;
-        _rows.putIfAbsent(m['exerciseId'] as String, () => []).add(
+        _rows
+            .putIfAbsent(m['exerciseId'] as String, () => [])
+            .add(
               _SetRow(weight: m['weight'] as String, reps: m['reps'] as String),
             );
       }
@@ -96,6 +100,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       'date': _today,
       'routineId': _routineId,
       'dirty': _dirty,
+      'collapsed': _collapsed.toList(),
       'sets': [
         for (final entry in _rows.entries)
           for (final row in entry.value)
@@ -142,10 +147,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
         child: routines.isEmpty
             ? const Padding(
                 padding: EdgeInsets.all(24),
-                child: Text(
-                  '루틴 탭에서 루틴을 먼저 만드세요',
-                  textAlign: TextAlign.center,
-                ),
+                child: Text('루틴 탭에서 루틴을 먼저 만드세요', textAlign: TextAlign.center),
               )
             : ListView(
                 shrinkWrap: true,
@@ -176,12 +178,13 @@ class _WorkoutPageState extends State<WorkoutPage> {
 
     setState(() {
       _clearRows();
+      _collapsed.clear();
       _routineId = picked;
       _dirty = false;
       for (final s in _todayLog(picked)?.sets ?? <SetRecord>[]) {
-        _rows.putIfAbsent(s.exerciseId, () => []).add(
-              _SetRow(weight: formatWeight(s.weight), reps: '${s.reps}'),
-            );
+        _rows
+            .putIfAbsent(s.exerciseId, () => [])
+            .add(_SetRow(weight: formatWeight(s.weight), reps: '${s.reps}'));
       }
     });
     _saveDraft();
@@ -195,8 +198,7 @@ class _WorkoutPageState extends State<WorkoutPage> {
       weight = rows.last.weight.text;
       reps = rows.last.reps.text;
     } else {
-      final prev = _previousLog(exerciseId)
-          ?.sets
+      final prev = _previousLog(exerciseId)?.sets
           .where((s) => s.exerciseId == exerciseId)
           .firstOrNull;
       if (prev != null) {
@@ -222,12 +224,15 @@ class _WorkoutPageState extends State<WorkoutPage> {
       final rows = _rows[id] ?? [];
       for (var i = 0; i < rows.length; i++) {
         if (rows[i].isEmpty) continue;
-        final weight =
-            double.tryParse(rows[i].weight.text.trim().replaceAll(',', '.'));
+        final weight = double.tryParse(
+          rows[i].weight.text.trim().replaceAll(',', '.'),
+        );
         final reps = int.tryParse(rows[i].reps.text.trim());
         if (weight == null || weight < 0 || reps == null || reps <= 0) {
           showMessage(
-              context, '${_exerciseName(id)} ${i + 1}세트의 무게나 횟수를 확인하세요.');
+            context,
+            '${_exerciseName(id)} ${i + 1}세트의 무게나 횟수를 확인하세요.',
+          );
           return;
         }
         records.add(SetRecord(exerciseId: id, weight: weight, reps: reps));
@@ -253,12 +258,14 @@ class _WorkoutPageState extends State<WorkoutPage> {
     } else if (existing != null) {
       existing.sets = records;
     } else {
-      widget.data.workouts.add(WorkoutLog(
-        id: newId(),
-        date: _today,
-        routineId: routine.id,
-        sets: records,
-      ));
+      widget.data.workouts.add(
+        WorkoutLog(
+          id: newId(),
+          date: _today,
+          routineId: routine.id,
+          sets: records,
+        ),
+      );
     }
     widget.onChanged();
     _dirty = false;
@@ -332,71 +339,113 @@ class _WorkoutPageState extends State<WorkoutPage> {
             top: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              child: FilledButton(
-                onPressed: _save,
-                child: const Text('저장'),
-              ),
+              child: FilledButton(onPressed: _save, child: const Text('저장')),
             ),
           ),
       ],
     );
   }
 
+  void _toggle(String id) {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      if (!_collapsed.remove(id)) _collapsed.add(id);
+    });
+    _saveDraft();
+  }
+
+  String _summary(List<_SetRow> rows) {
+    final filled = rows.where((r) => !r.isEmpty).toList();
+    if (filled.isEmpty) return '입력한 세트 없음';
+    final sets = filled
+        .map((r) => '${r.weight.text}×${r.reps.text}')
+        .join(', ');
+    return '${filled.length}세트 · $sets';
+  }
+
   Widget _exerciseCard(String id, ThemeData theme) {
     final rows = _rows[id] ?? [];
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+    final collapsed = _collapsed.contains(id);
+    final subStyle = theme.textTheme.bodyMedium?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+    );
+
+    final header = InkWell(
+      onTap: () => _toggle(id),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+        child: Row(
           children: [
-            Text(_exerciseName(id), style: theme.textTheme.titleLarge),
-            const SizedBox(height: 4),
-            Text(
-              _previousText(id),
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 8),
-            for (var i = 0; i < rows.length; i++)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
-                  children: [
-                    SizedBox(width: 52, child: Text('${i + 1}세트')),
-                    Expanded(
-                      child: _numberField(
-                        rows[i].weight,
-                        suffix: 'kg',
-                        decimal: true,
-                      ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6),
-                      child: Text('×'),
-                    ),
-                    Expanded(
-                      child: _numberField(rows[i].reps, suffix: '회'),
-                    ),
-                    IconButton(
-                      tooltip: '세트 삭제',
-                      icon: const Icon(Icons.close),
-                      onPressed: () => _removeSet(id, i),
-                    ),
-                  ],
-                ),
-              ),
-            Padding(
-              padding: const EdgeInsets.only(top: 4, right: 8),
-              child: OutlinedButton.icon(
-                onPressed: () => _addSet(id),
-                icon: const Icon(Icons.add),
-                label: const Text('세트 추가'),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(_exerciseName(id), style: theme.textTheme.titleLarge),
+                  const SizedBox(height: 4),
+                  Text(
+                    collapsed ? _summary(rows) : _previousText(id),
+                    style: subStyle,
+                  ),
+                ],
               ),
             ),
+            Icon(collapsed ? Icons.expand_more : Icons.expand_less, size: 32),
           ],
         ),
+      ),
+    );
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [header, if (!collapsed) _setInputs(id, rows)],
+      ),
+    );
+  }
+
+  Widget _setInputs(String id, List<_SetRow> rows) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 8, 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          for (var i = 0; i < rows.length; i++)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Row(
+                children: [
+                  SizedBox(width: 52, child: Text('${i + 1}세트')),
+                  Expanded(
+                    child: _numberField(
+                      rows[i].weight,
+                      suffix: 'kg',
+                      decimal: true,
+                    ),
+                  ),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 6),
+                    child: Text('×'),
+                  ),
+                  Expanded(child: _numberField(rows[i].reps, suffix: '회')),
+                  IconButton(
+                    tooltip: '세트 삭제',
+                    icon: const Icon(Icons.close),
+                    onPressed: () => _removeSet(id, i),
+                  ),
+                ],
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.only(top: 4, right: 8),
+            child: OutlinedButton.icon(
+              onPressed: () => _addSet(id),
+              icon: const Icon(Icons.add),
+              label: const Text('세트 추가'),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -414,14 +463,14 @@ class _WorkoutPageState extends State<WorkoutPage> {
       keyboardType: TextInputType.numberWithOptions(decimal: decimal),
       inputFormatters: [
         FilteringTextInputFormatter.allow(
-            decimal ? RegExp(r'[0-9.,]') : RegExp(r'[0-9]')),
+          decimal ? RegExp(r'[0-9.,]') : RegExp(r'[0-9]'),
+        ),
       ],
       scrollPadding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
       decoration: InputDecoration(
         suffixText: suffix,
         isDense: true,
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
       ),
       onChanged: (_) => _inputChanged(),
     );
