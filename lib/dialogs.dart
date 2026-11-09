@@ -6,16 +6,15 @@ Future<String?> showTextInput(
   required String hint,
   String initial = '',
   bool multiline = false,
-}) =>
-    showDialog<String>(
-      context: context,
-      builder: (context) => _TextInputDialog(
-        title: title,
-        hint: hint,
-        initial: initial,
-        multiline: multiline,
-      ),
-    );
+}) => showDialog<String>(
+  context: context,
+  builder: (context) => _TextInputDialog(
+    title: title,
+    hint: hint,
+    initial: initial,
+    multiline: multiline,
+  ),
+);
 
 Future<bool> showConfirm(
   BuildContext context, {

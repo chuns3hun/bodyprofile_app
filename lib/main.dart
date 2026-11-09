@@ -3,9 +3,11 @@ import 'package:flutter/services.dart';
 
 import 'dialogs.dart';
 import 'exercises_page.dart';
+import 'history_page.dart';
 import 'models.dart';
 import 'routines_page.dart';
 import 'storage.dart';
+import 'theme.dart';
 import 'workout_page.dart';
 
 void main() {
@@ -17,38 +19,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const bigText = TextStyle(fontSize: 18, fontWeight: FontWeight.w600);
-    const bigButton = Size(64, 56);
-
     return MaterialApp(
       title: '운동 기록',
-      theme: ThemeData(
-        colorSchemeSeed: Colors.indigo,
-        useMaterial3: true,
-        // 아이폰에서 누르기 쉽게 버튼과 글자를 키운다.
-        textTheme: const TextTheme(bodyLarge: TextStyle(fontSize: 18)),
-        filledButtonTheme: FilledButtonThemeData(
-          style: FilledButton.styleFrom(
-              minimumSize: bigButton, textStyle: bigText),
-        ),
-        outlinedButtonTheme: OutlinedButtonThemeData(
-          style: OutlinedButton.styleFrom(
-              minimumSize: bigButton, textStyle: bigText),
-        ),
-        textButtonTheme: TextButtonThemeData(
-          style: TextButton.styleFrom(
-            minimumSize: const Size(64, 48),
-            textStyle: const TextStyle(fontSize: 17),
-          ),
-        ),
-        iconButtonTheme: IconButtonThemeData(
-          style: IconButton.styleFrom(
-              minimumSize: const Size(48, 48), iconSize: 26),
-        ),
-        listTileTheme: const ListTileThemeData(minTileHeight: 64),
-        inputDecorationTheme:
-            const InputDecorationTheme(border: OutlineInputBorder()),
-      ),
+      debugShowCheckedModeBanner: false,
+      theme: buildTheme(),
       home: const HomePage(),
     );
   }
@@ -62,7 +36,7 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  static const _titles = ['오늘 운동', '루틴', '종목'];
+  static const _titles = ['오늘 운동', '기록', '루틴', '종목'];
 
   AppData? _data;
   String? _error;
@@ -150,6 +124,7 @@ class _HomePageState extends State<HomePage> {
             onChanged: _changed,
             keyboardOpen: MediaQuery.viewInsetsOf(context).bottom > 0,
           ),
+          HistoryPage(data: data),
           RoutinesPage(data: data, onChanged: _changed),
           ExercisesPage(data: data, onChanged: _changed),
         ],
@@ -182,11 +157,25 @@ class _HomePageState extends State<HomePage> {
               },
               destinations: const [
                 NavigationDestination(
-                    icon: Icon(Icons.fitness_center), label: '오늘 운동'),
+                  icon: Icon(Icons.fitness_center_outlined),
+                  selectedIcon: Icon(Icons.fitness_center),
+                  label: '오늘 운동',
+                ),
                 NavigationDestination(
-                    icon: Icon(Icons.playlist_add_check), label: '루틴'),
+                  icon: Icon(Icons.insights_outlined),
+                  selectedIcon: Icon(Icons.insights),
+                  label: '기록',
+                ),
                 NavigationDestination(
-                    icon: Icon(Icons.format_list_bulleted), label: '종목'),
+                  icon: Icon(Icons.view_list_outlined),
+                  selectedIcon: Icon(Icons.view_list),
+                  label: '루틴',
+                ),
+                NavigationDestination(
+                  icon: Icon(Icons.category_outlined),
+                  selectedIcon: Icon(Icons.category),
+                  label: '종목',
+                ),
               ],
             ),
     );

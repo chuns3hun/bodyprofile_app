@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import 'dialogs.dart';
+import 'exercises_page.dart';
+import 'history_page.dart';
 import 'models.dart';
 
 class RoutinesPage extends StatelessWidget {
@@ -13,18 +15,14 @@ class RoutinesPage extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => RoutineEditPage(
-          data: data,
-          routine: routine,
-          onChanged: onChanged,
-        ),
+        builder: (_) =>
+            RoutineEditPage(data: data, routine: routine, onChanged: onChanged),
       ),
     );
   }
 
   Future<void> _add(BuildContext context) async {
-    final name =
-        await showTextInput(context, title: '루틴 만들기', hint: '예: 등+가슴');
+    final name = await showTextInput(context, title: '루틴 만들기', hint: '예: 등+가슴');
     if (name == null || name.trim().isEmpty) return;
     final routine = Routine(id: newId(), name: name.trim());
     data.routines.add(routine);
@@ -35,6 +33,7 @@ class RoutinesPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Expanded(
           child: data.routines.isEmpty
@@ -101,13 +100,6 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
     widget.onChanged();
   }
 
-  String _exerciseName(String id) {
-    for (final e in widget.data.exercises) {
-      if (e.id == id) return e.name;
-    }
-    return '삭제된 종목';
-  }
-
   void _reorder(int oldIndex, int newIndex) {
     _ids.insert(newIndex, _ids.removeAt(oldIndex));
     _changed();
@@ -121,14 +113,14 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
       showDragHandle: true,
       builder: (context) => StatefulBuilder(
         builder: (context, setSheetState) {
-          final exercises = widget.data.exercises;
+          final groups = groupedExercises(widget.data.exercises);
           return SafeArea(
             top: false,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (exercises.isEmpty)
+                if (groups.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(24),
                     child: Text(
@@ -141,20 +133,26 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
                     child: ListView(
                       shrinkWrap: true,
                       children: [
-                        for (final e in exercises)
-                          CheckboxListTile(
-                            title: Text(e.name),
-                            value: _ids.contains(e.id),
-                            onChanged: (checked) {
-                              if (checked == true) {
-                                _ids.add(e.id);
-                              } else {
-                                _ids.remove(e.id);
-                              }
-                              setSheetState(() {});
-                              _changed();
-                            },
-                          ),
+                        for (final (label, exercises) in groups) ...[
+                          partHeader(context, label),
+                          for (final e in exercises)
+                            CheckboxListTile(
+                              title: Text(e.name),
+                              subtitle: e.detail.isEmpty
+                                  ? null
+                                  : Text(e.detail),
+                              value: _ids.contains(e.id),
+                              onChanged: (checked) {
+                                if (checked == true) {
+                                  _ids.add(e.id);
+                                } else {
+                                  _ids.remove(e.id);
+                                }
+                                setSheetState(() {});
+                                _changed();
+                              },
+                            ),
+                        ],
                       ],
                     ),
                   ),
@@ -217,10 +215,14 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
                       onReorderItem: _reorder,
                       itemBuilder: (context, i) {
                         final id = _ids[i];
+                        final exercise = findExercise(widget.data, id);
+                        final detail = exercise?.detail ?? '';
                         return ListTile(
                           key: ValueKey(id),
-                          contentPadding:
-                              const EdgeInsets.only(left: 4, right: 8),
+                          contentPadding: const EdgeInsets.only(
+                            left: 4,
+                            right: 8,
+                          ),
                           leading: ReorderableDragStartListener(
                             index: i,
                             child: const SizedBox(
@@ -229,7 +231,10 @@ class _RoutineEditPageState extends State<RoutineEditPage> {
                               child: Icon(Icons.drag_handle, size: 30),
                             ),
                           ),
-                          title: Text('${i + 1}. ${_exerciseName(id)}'),
+                          title: Text(
+                            '${i + 1}. ${exercise?.name ?? '삭제된 종목'}',
+                          ),
+                          subtitle: detail.isEmpty ? null : Text(detail),
                           trailing: IconButton(
                             tooltip: '루틴에서 빼기',
                             icon: const Icon(Icons.close),

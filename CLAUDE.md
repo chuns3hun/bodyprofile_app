@@ -13,9 +13,10 @@
 - `lib/models.dart`: 데이터 클래스 (Exercise, Routine, SetRecord, WorkoutLog, WeightRecord, AppData)
 - `lib/storage.dart`: shared_preferences에 JSON 하나로 저장, 백업은 클립보드 복사/붙여넣기. 오늘 운동 입력 임시본은 별도 키 `workout_draft`
 - `lib/main.dart`: 앱 테마, 하단 탭, 백업 메뉴
-- `lib/workout_page.dart`: 오늘 운동 (루틴 선택, 직전 기록, 세트 입력, 저장)
+- `lib/workout_page.dart`: 오늘 운동 (루틴 선택, 오늘만 종목 추가, 최근 기록·최고 기록, 세트 입력, 저장)
+- `lib/history_page.dart`: 기록 탭(날짜별), 종목별 전체 기록과 그래프, 기록 계산 함수
 - `lib/routines_page.dart`: 루틴 목록과 루틴 편집
-- `lib/exercises_page.dart`: 종목 추가/수정/삭제
+- `lib/exercises_page.dart`: 종목 추가/수정/삭제 (이름, 부위, 기구 종류, 회사, 메모), 부위별 묶기
 - `lib/dialogs.dart`: 공용 입력·확인 창
 
 ## 데이터 주의사항
